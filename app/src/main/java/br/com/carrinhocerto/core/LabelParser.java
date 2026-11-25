@@ -41,7 +41,7 @@ public final class LabelParser {
     }
 
     // Preço com decimais: "24,90", "R$24.90", "1.234,56". Não pode estar colado a outros dígitos.
-    private static final Pattern PRICE = Pattern.compile("(?<![\\d/.,])(\\d{1,3}(?:\\.\\d{3})+|\\d{1,4})\\s?[,.]\\s?(\\d{2})(?![\\d%/])");
+    private static final Pattern PRICE = Pattern.compile("(?<![\\d/.,])(\\d{1,3}(?:\\.\\d{3})+|\\d{1,4})\\s?[,.]\\s?(\\d{2})(?![\\d%/])(?!\\s?(?i:KG|G|GR|ML|L|LT|UN|M)\\b)");
     private static final Pattern DATE = Pattern.compile("\\b\\d{1,2}[/-]\\d{1,2}([/-]\\d{2,4})?\\b");
     private static final Pattern DIGIT_RUN = Pattern.compile("\\d{8,14}");
     private static final Pattern INT_ONLY = Pattern.compile("^(?:R\\$)?\\s?(\\d{1,4})[,.]?$");

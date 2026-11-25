@@ -67,6 +67,19 @@ public final class LabelParserCases {
                         L("R$ 2.199,00", 50, 70, 560, 200)),
                 "Tv Smart 50 Pol", 219900, null);
 
+        // 8) Gramatura com duas casas decimais no nome não pode virar preço
+        Result(fails, "gramatura-decimal",
+                Arrays.asList(
+                        L("REFRIGERANTE COLA 2,25L", 10, 10, 520, 50),
+                        L("R$ 9,49", 120, 70, 520, 200),
+                        L("R$/L 4,22", 10, 210, 200, 235)),
+                "Refrigerante Cola 2,25l", 949, null);
+        Result(fails, "gramatura-kg",
+                Arrays.asList(
+                        L("SABAO EM PO 1,02KG", 10, 10, 520, 50),
+                        L("15,90", 120, 70, 520, 200)),
+                "Sabao em Po 1,02kg", 1590, null);
+
         // 7) Sem preço legível
         LabelParser.Result r7 = LabelParser.parse(Arrays.asList(L("DETERGENTE YPE NEUTRO 500ML", 0, 0, 400, 40)));
         if (r7.hasPrice()) fails.add("sem-preco: esperava nenhum preço, veio " + r7.prices);
