@@ -82,3 +82,9 @@ jobs:
         with:
           name: telas-emulador
           path: shots/
+      - name: Anexar telas ao Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          files: shots/*.png
