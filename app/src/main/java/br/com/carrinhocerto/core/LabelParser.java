@@ -357,6 +357,7 @@ public final class LabelParser {
 
     /** "ARROZ TIO JOAO TIPO 1 5KG" -> "Arroz Tio Joao Tipo 1 5kg" */
     public static String prettify(String s) {
+        s = s.replaceAll("[ÁÀÂ](O|OS|ES)\\b", "Ã$1").replaceAll("[áàâ](o|os|es)\\b", "ã$1");
         String[] parts = s.trim().replaceAll("\\s+", " ").split(" ");
         StringBuilder sb = new StringBuilder();
         for (String p : parts) {

@@ -205,6 +205,15 @@ for i, (f, qty, exp_name, exp_cents) in enumerate(LABELS, 1):
     results.append({"foto": f, "nome_lido": name, "preco_lido": price, "aviso": banner, "segundos": elapsed,
                     "nome_esperado": exp_name, "preco_esperado": f"{exp_cents // 100},{exp_cents % 100:02d}"})
     print(results[-1], flush=True)
+    if not re.match(r"^\d+[,.]\d{2}$", price):
+        # leitura falhou: faz o que a pessoa faria, digita o preço
+        tap_id(f"{PKG}:id/price")
+        time.sleep(0.6)
+        sh("input", "text", results[-1]["preco_esperado"])
+        time.sleep(0.8)
+        sh("input", "keyevent", "KEYCODE_BACK")
+        time.sleep(0.8)
+        results[-1]["corrigido_a_mao"] = True
     for _ in range(qty - 1):
         tap_id(f"{PKG}:id/plus")
         time.sleep(0.45)

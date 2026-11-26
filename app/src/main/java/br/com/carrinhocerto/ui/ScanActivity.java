@@ -328,8 +328,21 @@ public class ScanActivity extends AppCompatActivity {
             LabelParser.Result res = recognize(crop);
             if (!res.hasPrice()) {
                 // a etiqueta pode ter ficado parcialmente fora da moldura: tenta a foto inteira
-                LabelParser.Result again = recognize(full);
-                if (again.hasPrice() || res.name.isEmpty()) res = again;
+                Bitmap src = crop;
+                List<OcrLine> srcLines = lastLines;
+                if (crop != full) {
+                    LabelParser.Result again = recognize(full);
+                    if (again.hasPrice() || res.name.isEmpty()) { res = again; src = full; srcLines = lastLines; }
+                }
+                if (!res.hasPrice()) {
+                    // segunda passada: amplia só a região do preço e lê de novo (centavos pequenos costumam falhar)
+                    LabelParser.Result zoom = zoomOnPrice(src, srcLines);
+                    if (zoom != null && zoom.hasPrice()) {
+                        res.prices.clear();
+                        res.prices.addAll(zoom.prices);
+                        res.rawText = res.rawText + "\n[zoom] " + zoom.rawText.replace('\n', ' ');
+                    }
+                }
             }
             String barcode = readBarcode(crop);
             if (barcode == null) barcode = res.barcode;
@@ -377,6 +390,33 @@ public class ScanActivity extends AppCompatActivity {
         finish();
     }
 
+    private List<OcrLine> lastLines = new ArrayList<>();
+
+    /** Recorta em volta da linha numérica mais alta (o preço), amplia e roda o OCR de novo. */
+    private LabelParser.Result zoomOnPrice(Bitmap src, List<OcrLine> lines) throws Exception {
+        OcrLine best = null;
+        for (OcrLine l : lines) {
+            String t = l.text.replace(" ", "");
+            if (t.matches(".*\\d{8,}.*")) continue;               // código de barras impresso
+            if (!t.matches(".*\\d.*")) continue;
+            if (best == null || l.height() > best.height()) best = l;
+        }
+        if (best == null) return null;
+        int h = best.height(), w = best.width();
+        int left = Math.max(0, best.left - (int) (w * 0.35f));
+        int right = Math.min(src.getWidth(), best.right + (int) (w * 0.6f) + h);
+        int top = Math.max(0, best.top - (int) (h * 0.45f));
+        int bottom = Math.min(src.getHeight(), best.bottom + (int) (h * 0.45f));
+        if (right - left < 10 || bottom - top < 10) return null;
+        Bitmap region = Bitmap.createBitmap(src, left, top, right - left, bottom - top);
+        float scale = Math.min(3f, Math.max(1f, 420f / region.getHeight()));
+        if (scale > 1.05f) {
+            region = Bitmap.createScaledBitmap(region, Math.round(region.getWidth() * scale), Math.round(region.getHeight() * scale), true);
+        }
+        android.util.Log.i("CarrinhoOCR", "zoom no preço: '" + best.text + "' x" + scale);
+        return recognize(region);
+    }
+
     private LabelParser.Result recognize(Bitmap bmp) throws Exception {
         long t0 = android.os.SystemClock.elapsedRealtime();
         android.util.Log.i("CarrinhoOCR", "OCR iniciando " + bmp.getWidth() + "x" + bmp.getHeight());
@@ -395,6 +435,7 @@ public class ScanActivity extends AppCompatActivity {
                 lines.add(ol);
             }
         }
+        lastLines = lines;
         return LabelParser.parse(lines);
     }
 

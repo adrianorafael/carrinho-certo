@@ -80,6 +80,11 @@ public final class LabelParserCases {
                         L("15,90", 120, 70, 520, 200)),
                 "Sabao em Po 1,02kg", 1590, null);
 
+        // 9) OCR trocou Ã por Á
+        Result(fails, "acento-ocr",
+                Arrays.asList(L("FEIJÁO CARIOCA TIPO 1 1KG", 10, 10, 520, 50), L("R$ 7,49", 120, 70, 520, 200)),
+                "Feijão Carioca Tipo 1 1kg", 749, null);
+
         // 7) Sem preço legível
         LabelParser.Result r7 = LabelParser.parse(Arrays.asList(L("DETERGENTE YPE NEUTRO 500ML", 0, 0, 400, 40)));
         if (r7.hasPrice()) fails.add("sem-preco: esperava nenhum preço, veio " + r7.prices);
