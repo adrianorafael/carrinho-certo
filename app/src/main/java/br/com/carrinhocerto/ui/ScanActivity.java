@@ -339,6 +339,7 @@ public class ScanActivity extends AppCompatActivity {
                     LabelParser.Result zoom = zoomOnPrice(src, srcLines);
                     if (zoom != null) {
                         long cents = LabelParser.parseZoomedPrice(lastLines);
+                        android.util.Log.i("CarrinhoOCR", "zoom linhas=" + lastLines + " -> " + cents);
                         if (cents > 0) res.prices.add(LabelParser.candidate(cents, "zoom"));
                         res.rawText = res.rawText + "\n[zoom] " + zoom.rawText.replace('\n', ' ');
                     }

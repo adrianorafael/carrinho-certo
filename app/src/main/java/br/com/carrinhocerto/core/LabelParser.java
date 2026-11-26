@@ -263,7 +263,7 @@ public final class LabelParser {
             Matcher c = Pattern.compile("^[,.](\\d{2})$|^(\\d{2})$").matcher(v);
             if (c.matches()) { String cv = c.group(1) != null ? c.group(1) : c.group(2); if (cents == null || v.startsWith(",") || v.startsWith(".")) { cents = cv; centsH = t.height(); } }
         }
-        if (bigInt != null && cents != null && bigInt.height() > centsH) {
+        if (bigInt != null && cents != null) {
             long joined = toCents(bigIntVal, cents);
             if (direct < 0 || bigInt.height() > directH) return joined;
         }
