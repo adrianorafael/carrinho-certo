@@ -45,10 +45,23 @@ def node(xml, rid=None, text=None):
         return {"x": (int(b[1]) + int(b[3])) // 2, "y": (int(b[2]) + int(b[4])) // 2, "text": t[1] if t else ""}
     return None
 
-def tap_id(rid, wait=10, text=None):
+def dismiss_anr(xml=None):
+    """Fecha diálogos "isn't responding" do sistema (comuns em emulador recém-ligado)."""
+    xml = xml if xml is not None else dump()
+    if "responding" in xml:
+        n = node(xml, text="Wait") or node(xml, text="Close app")
+        if n:
+            sh("input", "tap", str(n["x"]), str(n["y"]))
+            time.sleep(1.5)
+            return True
+    return False
+
+def tap_id(rid, wait=15, text=None):
     end = time.time() + wait
     while time.time() < end:
-        n = node(dump(), rid, text)
+        x = dump()
+        if dismiss_anr(x): continue
+        n = node(x, rid, text)
         if n:
             sh("input", "tap", str(n["x"]), str(n["y"]))
             return n
@@ -64,6 +77,7 @@ def wait_for(act, timeout=40):
     end = time.time() + timeout
     while time.time() < end:
         if act in top(): return True
+        dismiss_anr()
         time.sleep(0.5)
     return False
 
@@ -92,6 +106,17 @@ missing = [f for f, *_ in LABELS if f not in ids]
 if missing: sys.exit("imagens não indexadas: " + str(missing))
 
 adb("logcat", "-c")
+sh("wm", "dismiss-keyguard")
+# deixa o sistema assentar e fecha avisos de "não está respondendo" antes de gravar
+sh("am", "start", "-W", "-n", f"{PKG}/.ui.MainActivity")
+calm = 0
+for _ in range(40):
+    if dismiss_anr():
+        calm = 0
+    else:
+        calm += 1
+        if calm >= 4: break
+    time.sleep(2)
 sh("am", "start", "-W", "-n", f"{PKG}/.ui.MainActivity")
 time.sleep(2)
 
