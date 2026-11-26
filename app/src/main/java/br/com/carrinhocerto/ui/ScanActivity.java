@@ -18,6 +18,7 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
@@ -153,6 +154,17 @@ public class ScanActivity extends AppCompatActivity {
             }
         });
         shutter.setOnClickListener(v -> capture());
+        View gallery = findViewById(R.id.btnGallery);
+        gallery.setVisibility(MODE_LABEL.equals(mode) ? View.VISIBLE : View.GONE);
+        gallery.setOnClickListener(v -> pickImage.launch(new PickVisualMediaRequest.Builder()
+                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build()));
+
+        // Etiqueta compartilhada de outro app (Galeria, WhatsApp...): lê direto, sem abrir a câmera
+        if (Intent.ACTION_SEND.equals(getIntent().getAction())) {
+            Uri shared = getIntent().getParcelableExtra(Intent.EXTRA_STREAM);
+            mode = MODE_LABEL;
+            if (shared != null) { readFromUri(shared); return; }
+        }
 
         // espera o layout para que a moldura e o "viewport" (recorte da captura) tenham tamanho real
         preview.post(() -> {
@@ -277,10 +289,32 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
-    private void processLabel(File f) {
+    /** Lê a etiqueta de uma foto já existente (galeria ou compartilhada). */
+    private void readFromUri(Uri uri) {
+        busyText.setText("Lendo etiqueta…");
+        busy.setVisibility(View.VISIBLE);
+        worker.execute(() -> {
+            File tmp = ImageUtils.tempFile(this);
+            try (java.io.InputStream in = getContentResolver().openInputStream(uri);
+                 java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
+                if (in == null) throw new java.io.IOException("sem dados");
+                byte[] buf = new byte[16384];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            } catch (Exception e) {
+                fail("Não consegui abrir essa imagem.");
+                return;
+            }
+            processLabel(tmp, false);
+        });
+    }
+
+    private void processLabel(File f) { processLabel(f, true); }
+
+    private void processLabel(File f, boolean cropToFrame) {
         try {
             Bitmap full = ImageUtils.decode(f, 2200);
-            Bitmap crop = ImageUtils.cropFraction(full, frameFraction());
+            Bitmap crop = cropToFrame ? ImageUtils.cropFraction(full, frameFraction()) : full;
 
             LabelParser.Result res = recognize(crop);
             if (!res.hasPrice()) {
@@ -290,6 +324,8 @@ public class ScanActivity extends AppCompatActivity {
             }
             String barcode = readBarcode(crop);
             if (barcode == null) barcode = res.barcode;
+            android.util.Log.i("CarrinhoOCR", "texto=" + res.rawText.replace('\n', '|') + " ; nome=" + res.name
+                    + " ; precos=" + res.prices + " ; codigo=" + barcode);
 
             Bitmap labelSmall = scaleTo(crop, 1100);
             String labelPath = ImageUtils.savePrivate(this, labelSmall, "etiqueta");
@@ -310,9 +346,19 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
+    private final ActivityResultLauncher<PickVisualMediaRequest> pickImage =
+            registerForActivityResult(new ActivityResultContracts.PickVisualMedia(), uri -> {
+                if (uri != null) readFromUri(uri);
+            });
+
     private void deliver(Intent data) {
         if (getCallingActivity() != null) {
             setResult(RESULT_OK, data);
+        } else if (Intent.ACTION_SEND.equals(getIntent().getAction())) {
+            // veio de outro app: abre o carrinho por baixo, para voltar a ele depois de salvar
+            Intent main = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            Intent item = new Intent(this, ItemActivity.class).putExtras(data);
+            startActivities(new Intent[]{main, item});
         } else {
             Intent i = new Intent(this, ItemActivity.class);
             i.putExtras(data);

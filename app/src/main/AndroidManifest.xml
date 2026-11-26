@@ -24,9 +24,16 @@
 
         <activity
             android:name=".ui.ScanActivity"
-            android:exported="false"
+            android:exported="true"
+            android:label="Ler etiqueta"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.Carrinho.Camera" />
+            android:theme="@style/Theme.Carrinho.Camera">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ui.ItemActivity"
