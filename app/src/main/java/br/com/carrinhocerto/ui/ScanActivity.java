@@ -342,6 +342,7 @@ public class ScanActivity extends AppCompatActivity {
                     .putExtra(R_RAW, res.rawText);
             runOnUiThread(() -> deliver(data));
         } catch (Exception e) {
+            android.util.Log.e("CarrinhoOCR", "falha ao ler etiqueta", e);
             fail("Não consegui ler a etiqueta. Tente aproximar e evitar reflexo.");
         }
     }
@@ -368,7 +369,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     private LabelParser.Result recognize(Bitmap bmp) throws Exception {
-        Text text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 15, TimeUnit.SECONDS);
+        Text text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 45, TimeUnit.SECONDS);
         List<OcrLine> lines = new ArrayList<>();
         for (Text.TextBlock block : text.getTextBlocks()) {
             for (Text.Line line : block.getLines()) {
