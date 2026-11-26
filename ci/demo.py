@@ -143,6 +143,13 @@ stop_rec = threading.Event()
 segments = []
 current = {"p": None}
 
+events = []
+seg_starts = []
+
+def ev(name):
+    events.append({"t": time.time(), "e": name})
+    print("EV", name, flush=True)
+
 def recorder():
     # screenrecord grava no máximo 3 min por arquivo: encadeia vários segmentos
     k = 0
@@ -150,6 +157,7 @@ def recorder():
         k += 1
         name = f"/sdcard/demo_{k:02d}.mp4"
         segments.append(name)
+        seg_starts.append(time.time())
         current["p"] = subprocess.Popen(["adb", "shell", "screenrecord", "--bit-rate", "12000000", "--time-limit", "170", name])
         current["p"].wait()
 
@@ -172,12 +180,15 @@ def _salvar():
         fo.write(subprocess.run(["adb", "logcat", "-d", "-v", "brief", "CarrinhoOCR:V", "AndroidRuntime:E", "MlKit*:V", "*:S"], capture_output=True, text=True).stdout)
     with open(f"{OUT}/logcat_full.txt", "w") as fo:
         fo.write(subprocess.run(["adb", "logcat", "-d", "-v", "time"], capture_output=True, text=True).stdout)
+    with open(f"{OUT}/eventos.json", "w") as fo:
+        json.dump({"segmentos": [{"arquivo": os.path.basename(a), "inicio": b} for a, b in zip(segments, seg_starts)], "eventos": events}, fo, indent=1)
     with open(f"{OUT}/resultados.json", "w") as fo:
         json.dump(results, fo, ensure_ascii=False, indent=2)
     print(open(f"{OUT}/ocr_log.txt").read())
 time.sleep(2.5)
 shot("00_vazio")
 
+ev("loja_toque")
 tap_id(f"{PKG}:id/storeBar")
 time.sleep(1.2)
 sh("input", "text", "Supermercado%sCentral")
@@ -187,15 +198,19 @@ time.sleep(1.5)
 
 for i, (f, qty, exp_name, exp_cents) in enumerate(LABELS, 1):
     stage(f)
+    ev(f"etq{i}_escanear")
     tap_id(f"{PKG}:id/btnScan")
     wait_for(".ui.ScanActivity", 15)
     time.sleep(2.0)
+    ev(f"etq{i}_galeria")
     tap_id(f"{PKG}:id/btnGallery")
     time.sleep(2.0)
     pick_first_photo()
+    ev(f"etq{i}_lendo")
     t0 = time.time()
     ok = wait_for(".ui.ItemActivity", 170)
     elapsed = round(time.time() - t0, 1)
+    ev(f"etq{i}_confirmar")
     time.sleep(1.6)
     x = dump()
     name = (node(x, f"{PKG}:id/name") or {}).get("text", "")
@@ -207,6 +222,7 @@ for i, (f, qty, exp_name, exp_cents) in enumerate(LABELS, 1):
     print(results[-1], flush=True)
     if not re.match(r"^\d+[,.]\d{2}$", price):
         # leitura falhou: faz o que a pessoa faria, digita o preço
+        ev(f"etq{i}_digitar_preco")
         tap_id(f"{PKG}:id/price")
         time.sleep(0.6)
         sh("input", "text", results[-1]["preco_esperado"])
@@ -218,16 +234,20 @@ for i, (f, qty, exp_name, exp_cents) in enumerate(LABELS, 1):
         tap_id(f"{PKG}:id/plus")
         time.sleep(0.45)
     time.sleep(0.9)
+    ev(f"etq{i}_adicionar")
     tap_id(f"{PKG}:id/btnSave")
     wait_for(".ui.MainActivity", 15)
     time.sleep(2.0)
 
+ev("carrinho_total")
 shot("06_carrinho")
 time.sleep(2.5)
+ev("finalizar")
 tap_id(f"{PKG}:id/btnFinish")
 time.sleep(2.2)
 tap_id("android:id/button1")
 time.sleep(2.5)
+ev("historico")
 tap_id(f"{PKG}:id/menu_history")
 time.sleep(3.5)
 shot("07_historico")
@@ -235,7 +255,9 @@ x = dump()
 n = node(x, f"{PKG}:id/store")
 if n: sh("input", "tap", str(n["x"]), str(n["y"]))
 time.sleep(3.5)
+ev("detalhe_compra")
 shot("08_compra")
 time.sleep(1)
 
+ev("fim")
 print("demo concluída")
