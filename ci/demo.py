@@ -152,6 +152,8 @@ def _salvar():
     adb("pull", "/sdcard/demo.mp4", f"{OUT}/demo.mp4")
     with open(f"{OUT}/ocr_log.txt", "w") as fo:
         fo.write(subprocess.run(["adb", "logcat", "-d", "-v", "brief", "CarrinhoOCR:V", "AndroidRuntime:E", "MlKit*:V", "*:S"], capture_output=True, text=True).stdout)
+    with open(f"{OUT}/logcat_full.txt", "w") as fo:
+        fo.write(subprocess.run(["adb", "logcat", "-d", "-v", "time"], capture_output=True, text=True).stdout)
     with open(f"{OUT}/resultados.json", "w") as fo:
         json.dump(results, fo, ensure_ascii=False, indent=2)
     print(open(f"{OUT}/ocr_log.txt").read())

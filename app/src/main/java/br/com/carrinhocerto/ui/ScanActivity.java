@@ -369,7 +369,10 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     private LabelParser.Result recognize(Bitmap bmp) throws Exception {
+        long t0 = android.os.SystemClock.elapsedRealtime();
+        android.util.Log.i("CarrinhoOCR", "OCR iniciando " + bmp.getWidth() + "x" + bmp.getHeight());
         Text text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 45, TimeUnit.SECONDS);
+        android.util.Log.i("CarrinhoOCR", "OCR ok em " + (android.os.SystemClock.elapsedRealtime() - t0) + " ms");
         List<OcrLine> lines = new ArrayList<>();
         for (Text.TextBlock block : text.getTextBlocks()) {
             for (Text.Line line : block.getLines()) {
