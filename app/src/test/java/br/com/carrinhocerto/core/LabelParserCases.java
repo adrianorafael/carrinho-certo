@@ -85,6 +85,14 @@ public final class LabelParserCases {
                 Arrays.asList(L("FEIJÁO CARIOCA TIPO 1 1KG", 10, 10, 520, 50), L("R$ 7,49", 120, 70, 520, 200)),
                 "Feijão Carioca Tipo 1 1kg", 749, null);
 
+        // 10) Recorte ampliado do preço com ordem embaralhada: "7" grande + "RS,49"
+        OcrLine z = L("7 RS,49", 0, 0, 600, 300)
+                .addWord(L("7", 250, 0, 420, 300))
+                .addWord(L("RS,49", 30, 120, 600, 260));
+        check(fails, "zoom1", String.valueOf(LabelParser.parseZoomedPrice(Arrays.asList(z))), "749");
+        check(fails, "zoom2", String.valueOf(LabelParser.parseZoomedPrice(Arrays.asList(L("R$ 16,98", 0, 0, 600, 200)))), "1698");
+        check(fails, "rs", String.valueOf(LabelParser.parse(Arrays.asList(L("ACUCAR 1KG", 0, 0, 300, 40), L("RS 4,39", 0, 60, 300, 200))).bestPriceCents()), "439");
+
         // 7) Sem preço legível
         LabelParser.Result r7 = LabelParser.parse(Arrays.asList(L("DETERGENTE YPE NEUTRO 500ML", 0, 0, 400, 40)));
         if (r7.hasPrice()) fails.add("sem-preco: esperava nenhum preço, veio " + r7.prices);

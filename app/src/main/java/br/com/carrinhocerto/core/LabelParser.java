@@ -29,6 +29,8 @@ public final class LabelParser {
         @Override public String toString() { return Money.format(cents) + " (" + String.format(Locale.ROOT, "%.2f", score) + ")"; }
     }
 
+    public static PriceCandidate candidate(long cents, String source) { return new PriceCandidate(cents, 1.0, source); }
+
     public static final class Result {
         public String name = "";
         public final List<String> nameCandidates = new ArrayList<>();
@@ -212,6 +214,7 @@ public final class LabelParser {
 
     /** Corrige confusões típicas do OCR em tokens que são quase todos numéricos. */
     static String fixDigits(String s) {
+        s = s.replaceAll("\\bR[S5]\\s?(?=[\\d,.OoIl])", "R\\$ ");   // "RS 4,39" / "R5,49" = "R$"
         StringBuilder out = new StringBuilder();
         Matcher m = Pattern.compile("[0-9OoIlSBZ,.]+").matcher(s);
         int last = 0;
@@ -236,6 +239,35 @@ public final class LabelParser {
         int n = 0;
         for (char c : s.toCharArray()) if (Character.isLetterOrDigit(c)) n++;
         return Math.max(1, n);
+    }
+
+    /**
+     * Leitura de um recorte ampliado que contém só o preço: junta o número inteiro mais alto
+     * com os centavos (",49"), mesmo que o OCR tenha embaralhado a ordem ou grudado o "R$".
+     * Retorna centavos ou -1.
+     */
+    public static long parseZoomedPrice(List<OcrLine> lines) {
+        List<OcrLine> toks = new ArrayList<>();
+        for (OcrLine l : lines) {
+            if (l.words.isEmpty()) toks.add(l); else toks.addAll(l.words);
+        }
+        long direct = -1; int directH = 0;
+        OcrLine bigInt = null; String bigIntVal = null;
+        String cents = null; int centsH = 0;
+        for (OcrLine t : toks) {
+            String v = fixDigits(t.text).replace("R$", "").replace("$", "").replace(" ", "");
+            Matcher full = Pattern.compile("^(\\d{1,4})[,.](\\d{2})$").matcher(v);
+            if (full.matches() && t.height() > directH) { direct = toCents(full.group(1), full.group(2)); directH = t.height(); continue; }
+            Matcher in = Pattern.compile("^(\\d{1,4})[,.]?$").matcher(v);
+            if (in.matches() && (bigInt == null || t.height() > bigInt.height())) { bigInt = t; bigIntVal = in.group(1); continue; }
+            Matcher c = Pattern.compile("^[,.](\\d{2})$|^(\\d{2})$").matcher(v);
+            if (c.matches()) { String cv = c.group(1) != null ? c.group(1) : c.group(2); if (cents == null || v.startsWith(",") || v.startsWith(".")) { cents = cv; centsH = t.height(); } }
+        }
+        if (bigInt != null && cents != null && bigInt.height() > centsH) {
+            long joined = toCents(bigIntVal, cents);
+            if (direct < 0 || bigInt.height() > directH) return joined;
+        }
+        return direct;
     }
 
     // ---------------------------------------------------------------- código de barras

@@ -337,9 +337,9 @@ public class ScanActivity extends AppCompatActivity {
                 if (!res.hasPrice()) {
                     // segunda passada: amplia só a região do preço e lê de novo (centavos pequenos costumam falhar)
                     LabelParser.Result zoom = zoomOnPrice(src, srcLines);
-                    if (zoom != null && zoom.hasPrice()) {
-                        res.prices.clear();
-                        res.prices.addAll(zoom.prices);
+                    if (zoom != null) {
+                        long cents = LabelParser.parseZoomedPrice(lastLines);
+                        if (cents > 0) res.prices.add(LabelParser.candidate(cents, "zoom"));
                         res.rawText = res.rawText + "\n[zoom] " + zoom.rawText.replace('\n', ' ');
                     }
                 }
