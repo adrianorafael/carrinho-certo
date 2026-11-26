@@ -90,6 +90,7 @@ public class ScanActivity extends AppCompatActivity {
     private TextView busyText;
     private ImageCapture imageCapture;
     private Camera camera;
+    private ProcessCameraProvider cameraProvider;
     private boolean torch;
     private volatile boolean done;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -207,6 +208,7 @@ public class ScanActivity extends AppCompatActivity {
         f.addListener(() -> {
             try {
                 ProcessCameraProvider provider = f.get();
+                cameraProvider = provider;
                 provider.unbindAll();
                 Preview p = new Preview.Builder().build();
                 p.setSurfaceProvider(preview.getSurfaceProvider());
@@ -251,6 +253,7 @@ public class ScanActivity extends AppCompatActivity {
         imageCapture.takePicture(new ImageCapture.OutputFileOptions.Builder(out).build(), worker,
                 new ImageCapture.OnImageSavedCallback() {
                     @Override public void onImageSaved(@NonNull ImageCapture.OutputFileResults r) {
+                        runOnUiThread(ScanActivity.this::releaseCamera);
                         if (MODE_PHOTO.equals(mode)) processPhoto(out);
                         else processLabel(out);
                     }
@@ -290,9 +293,15 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     /** Lê a etiqueta de uma foto já existente (galeria ou compartilhada). */
+    /** Desliga a câmera enquanto o OCR roda: libera CPU e bateria para a leitura. */
+    private void releaseCamera() {
+        if (cameraProvider != null) cameraProvider.unbindAll();
+    }
+
     private void readFromUri(Uri uri) {
         busyText.setText("Lendo etiqueta…");
         busy.setVisibility(View.VISIBLE);
+        releaseCamera();
         worker.execute(() -> {
             File tmp = ImageUtils.tempFile(this);
             try (java.io.InputStream in = getContentResolver().openInputStream(uri);
@@ -371,7 +380,7 @@ public class ScanActivity extends AppCompatActivity {
     private LabelParser.Result recognize(Bitmap bmp) throws Exception {
         long t0 = android.os.SystemClock.elapsedRealtime();
         android.util.Log.i("CarrinhoOCR", "OCR iniciando " + bmp.getWidth() + "x" + bmp.getHeight());
-        Text text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 45, TimeUnit.SECONDS);
+        Text text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 120, TimeUnit.SECONDS);
         android.util.Log.i("CarrinhoOCR", "OCR ok em " + (android.os.SystemClock.elapsedRealtime() - t0) + " ms");
         List<OcrLine> lines = new ArrayList<>();
         for (Text.TextBlock block : text.getTextBlocks()) {
@@ -406,6 +415,8 @@ public class ScanActivity extends AppCompatActivity {
     private void fail(String msg) {
         runOnUiThread(() -> {
             busy.setVisibility(View.GONE);
+            if (!Intent.ACTION_SEND.equals(getIntent().getAction())
+                    && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera();
             Dialogs.error(findViewById(R.id.root), msg);
         });
     }

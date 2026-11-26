@@ -138,18 +138,36 @@ sh("am", "start", "-W", "-n", f"{PKG}/.ui.MainActivity")
 time.sleep(2)
 
 # ---------------------------------------------------------------- gravação
-rec = subprocess.Popen(["adb", "shell", "screenrecord", "--bit-rate", "12000000", "--time-limit", "178", "/sdcard/demo.mp4"])
+import threading
+stop_rec = threading.Event()
+segments = []
+current = {"p": None}
+
+def recorder():
+    # screenrecord grava no máximo 3 min por arquivo: encadeia vários segmentos
+    k = 0
+    while not stop_rec.is_set():
+        k += 1
+        name = f"/sdcard/demo_{k:02d}.mp4"
+        segments.append(name)
+        current["p"] = subprocess.Popen(["adb", "shell", "screenrecord", "--bit-rate", "12000000", "--time-limit", "170", name])
+        current["p"].wait()
+
+rec_thread = threading.Thread(target=recorder, daemon=True)
+rec_thread.start()
 results = []
 
 import atexit
 @atexit.register
 def _salvar():
     shot("99_final")
+    stop_rec.set()
     sh("pkill", "-INT", "screenrecord")
-    try: rec.wait(timeout=30)
+    try: rec_thread.join(timeout=30)
     except Exception: pass
     time.sleep(3)
-    adb("pull", "/sdcard/demo.mp4", f"{OUT}/demo.mp4")
+    for seg in segments:
+        adb("pull", seg, f"{OUT}/{os.path.basename(seg)}")
     with open(f"{OUT}/ocr_log.txt", "w") as fo:
         fo.write(subprocess.run(["adb", "logcat", "-d", "-v", "brief", "CarrinhoOCR:V", "AndroidRuntime:E", "MlKit*:V", "*:S"], capture_output=True, text=True).stdout)
     with open(f"{OUT}/logcat_full.txt", "w") as fo:
@@ -176,7 +194,7 @@ for i, (f, qty, exp_name, exp_cents) in enumerate(LABELS, 1):
     time.sleep(2.0)
     pick_first_photo()
     t0 = time.time()
-    ok = wait_for(".ui.ItemActivity", 45)
+    ok = wait_for(".ui.ItemActivity", 170)
     elapsed = round(time.time() - t0, 1)
     time.sleep(1.6)
     x = dump()
