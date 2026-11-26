@@ -89,21 +89,38 @@ sh("pm", "grant", PKG, "android.permission.CAMERA")
 sh("settings", "put", "system", "show_touches", "1")
 sh("cmd", "statusbar", "collapse")
 sh("mkdir", "-p", "/sdcard/Pictures/etiquetas")
-for f, *_ in LABELS:
+# o launcher do emulador costuma travar logo após o boot; não é usado na demo
+sh("pm", "disable-user", "--user", "0", "com.google.android.apps.nexuslauncher")
+sh("am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS")
+
+def stage(f):
+    """Deixa na galeria só a foto da etiqueta da vez (o seletor de fotos mostra a mais recente primeiro)."""
+    sh("content", "delete", "--uri", "content://media/external/images/media", "--where", "_display_name LIKE 'foto_etiqueta%'")
+    sh("rm", "-f", "/sdcard/Pictures/etiquetas/*")
     adb("push", f"ci/demo/{f}", f"/sdcard/Pictures/etiquetas/{f}")
     sh("am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", f"file:///sdcard/Pictures/etiquetas/{f}")
-sh("content", "call", "--uri", "content://media", "--method", "scan_volume", "--arg", "external_primary")
-time.sleep(6)
-ids = {}
-for _ in range(10):
-    q = sh("content", "query", "--uri", "content://media/external/images/media", "--projection", "_id:_display_name")
-    for m in re.finditer(r"_id=(\d+), _display_name=([^\s,]+)", q):
-        ids[m.group(2)] = m.group(1)
-    if all(f in ids for f, *_ in LABELS): break
-    time.sleep(3)
-print("ids:", ids)
-missing = [f for f, *_ in LABELS if f not in ids]
-if missing: sys.exit("imagens não indexadas: " + str(missing))
+    for _ in range(20):
+        q = sh("content", "query", "--uri", "content://media/external/images/media", "--projection", "_display_name")
+        if f in q: return True
+        sh("content", "call", "--uri", "content://media", "--method", "scan_volume", "--arg", "external_primary")
+        time.sleep(1.5)
+    raise RuntimeError("foto não indexada: " + f)
+
+def pick_first_photo(timeout=25):
+    end = time.time() + timeout
+    while time.time() < end:
+        x = dump()
+        if dismiss_anr(x): continue
+        for m in re.finditer(r"<node [^>]*>", x):
+            n = m.group(0)
+            if ("icon_thumbnail" in n or "content-desc=\"Photo" in n) and "bounds" in n:
+                b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n)
+                sh("input", "tap", str((int(b[1]) + int(b[3])) // 2), str((int(b[2]) + int(b[4])) // 2))
+                return True
+        time.sleep(1)
+    with open(f"{OUT}/picker_dump.xml", "w") as fo: fo.write(x)
+    shot("erro_picker")
+    raise RuntimeError("seletor de fotos sem miniatura")
 
 adb("logcat", "-c")
 sh("wm", "dismiss-keyguard")
@@ -121,7 +138,23 @@ sh("am", "start", "-W", "-n", f"{PKG}/.ui.MainActivity")
 time.sleep(2)
 
 # ---------------------------------------------------------------- gravação
-rec = subprocess.Popen(["adb", "shell", "screenrecord", "--bit-rate", "12000000", "--time-limit", "175", "/sdcard/demo.mp4"])
+rec = subprocess.Popen(["adb", "shell", "screenrecord", "--bit-rate", "12000000", "--time-limit", "178", "/sdcard/demo.mp4"])
+results = []
+
+import atexit
+@atexit.register
+def _salvar():
+    shot("99_final")
+    sh("pkill", "-INT", "screenrecord")
+    try: rec.wait(timeout=30)
+    except Exception: pass
+    time.sleep(3)
+    adb("pull", "/sdcard/demo.mp4", f"{OUT}/demo.mp4")
+    with open(f"{OUT}/ocr_log.txt", "w") as fo:
+        fo.write(subprocess.run(["adb", "logcat", "-d", "-s", "CarrinhoOCR:I", "AndroidRuntime:E"], capture_output=True, text=True).stdout)
+    with open(f"{OUT}/resultados.json", "w") as fo:
+        json.dump(results, fo, ensure_ascii=False, indent=2)
+    print(open(f"{OUT}/ocr_log.txt").read())
 time.sleep(2.5)
 shot("00_vazio")
 
@@ -132,11 +165,14 @@ time.sleep(0.8)
 tap_id("android:id/button1")
 time.sleep(1.5)
 
-results = []
 for i, (f, qty, exp_name, exp_cents) in enumerate(LABELS, 1):
-    sh("am", "start", "-a", "android.intent.action.SEND", "-t", "image/jpeg", "--grant-read-uri-permission",
-       "--eu", "android.intent.extra.STREAM", f"content://media/external/images/media/{ids[f]}",
-       "-n", f"{PKG}/.ui.ScanActivity")
+    stage(f)
+    tap_id(f"{PKG}:id/btnScan")
+    wait_for(".ui.ScanActivity", 15)
+    time.sleep(2.0)
+    tap_id(f"{PKG}:id/btnGallery")
+    time.sleep(2.0)
+    pick_first_photo()
     t0 = time.time()
     ok = wait_for(".ui.ItemActivity", 45)
     elapsed = round(time.time() - t0, 1)
@@ -173,12 +209,4 @@ time.sleep(3.5)
 shot("08_compra")
 time.sleep(1)
 
-sh("pkill", "-INT", "screenrecord")
-rec.wait(timeout=30)
-time.sleep(3)
-adb("pull", "/sdcard/demo.mp4", f"{OUT}/demo.mp4")
-with open(f"{OUT}/ocr_log.txt", "w") as fo:
-    fo.write(subprocess.run(["adb", "logcat", "-d", "-s", "CarrinhoOCR:I", "AndroidRuntime:E"], capture_output=True, text=True).stdout)
-with open(f"{OUT}/resultados.json", "w") as fo:
-    json.dump(results, fo, ensure_ascii=False, indent=2)
-print(open(f"{OUT}/ocr_log.txt").read())
+print("demo concluída")
