@@ -65,7 +65,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="4dp"
                         android:layout_weight="1"
-                        android:text="Imagens"
+                        android:text="Fotos"
                         android:textSize="14sp"
                         app:icon="@drawable/ic_photo" />
 

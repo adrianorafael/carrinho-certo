@@ -254,9 +254,9 @@ try:
     check("leite com preço correto", "Preço correto" in joined)
     check("detergente: na nota e não no app", "Não registrado no app" in joined)
     check("resumo: pagou R$ 1,00 a mais", "R$ 1,00 a mais" in joined)
-    sh("input", "keyevent", "KEYCODE_BACK"); time.sleep(1.5)
-    sh("am", "start", "-W", "-n", f"{PKG}/.ui.HistoryActivity"); time.sleep(3)
-    x = dump()
+    tap(f"{PKG}:id/footerMain"); time.sleep(2)
+    tap(f"{PKG}:id/menu_history"); time.sleep(3)
+    x = wait_text("nota conferida", 15) or dump()
     shot("10_historico_conferida")
     check("histórico mostra 'nota conferida'", "nota conferida" in x)
 except Exception as e:
