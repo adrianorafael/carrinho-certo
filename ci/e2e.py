@@ -17,7 +17,8 @@ def sh(*a):
     return subprocess.run(["adb", "shell", *a], capture_output=True, text=True).stdout
 
 def adb(*a):
-    return subprocess.run(["adb", *a], capture_output=True, text=True).stdout
+    r = subprocess.run(["adb", *a], capture_output=True, text=True)
+    return r.stdout + r.stderr
 
 def shot(name):
     with open(f"{OUT}/{name}.png", "wb") as f:
@@ -162,7 +163,8 @@ try:
         tap("android:id/button1"); time.sleep(2)
         shot("01_versao_antiga")
         r = adb("install", "-r", "-g", new)
-        check("instala versão nova por cima da 1.0.15", "Success" in r, r.strip()[-80:])
+        check("instala versão nova por cima da 1.0.15", "Success" in r, r.strip()[-160:])
+        if "Success" not in r: raise RuntimeError("atualização falhou")
         sh("am", "start", "-W", "-n", f"{PKG}/.ui.HistoryActivity"); time.sleep(3)
         x = wait_text("Mercado Antigo", 20)
         check("histórico da versão antiga continua após atualizar", x is not None)

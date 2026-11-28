@@ -20,7 +20,7 @@ jobs:
           gradle-version: '8.14.3'
       - name: Gerar APK
         env:
-          VERSION_CODE: ${{ github.run_number }}0
+          VERSION_CODE: 9000${{ github.run_number }}
           KEYSTORE_FILE: ${{ github.workspace }}/signing/carrinho-certo.jks
           KEYSTORE_PASSWORD: carrinhocerto
           KEY_ALIAS: carrinho
