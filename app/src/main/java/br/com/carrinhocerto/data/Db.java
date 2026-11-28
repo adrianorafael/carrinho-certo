@@ -501,4 +501,87 @@ public final class Db extends SQLiteOpenHelper {
         p.cents = found.cents; p.store = found.store; p.when = found.when; p.name = found.name; p.byWeight = found.byWeight;
         return p;
     }
+
+    // ============================================================ conferência da nota
+
+    /** Conferência salva: as linhas lidas (já revisadas) e as associações feitas à mão. */
+    public static final class SavedReceipt {
+        public br.com.carrinhocerto.core.Receipt receipt;
+        public java.util.Map<Integer, Long> forced = new java.util.HashMap<>();
+    }
+
+    public void saveReceipt(long tripId, br.com.carrinhocerto.core.Receipt r, java.util.Map<Integer, Long> forced, long diffCents) {
+        try {
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("total", r.totalCents);
+            o.put("discountTotal", r.discountTotalCents);
+            if (r.store != null) o.put("store", r.store);
+            org.json.JSONArray ls = new org.json.JSONArray();
+            for (br.com.carrinhocerto.core.Receipt.Line l : r.lines) {
+                org.json.JSONObject j = new org.json.JSONObject();
+                j.put("seq", l.seq); j.put("code", l.code == null ? "" : l.code); j.put("desc", l.desc);
+                j.put("qty", l.qty); j.put("unit", l.unit); j.put("unitCents", l.unitCents); j.put("totalCents", l.totalCents);
+                j.put("disc", l.discountCents); j.put("sur", l.surchargeCents);
+                ls.put(j);
+            }
+            o.put("lines", ls);
+            org.json.JSONObject f = new org.json.JSONObject();
+            for (java.util.Map.Entry<Integer, Long> e : forced.entrySet()) f.put(String.valueOf(e.getKey()), e.getValue());
+            o.put("forced", f);
+            ContentValues v = new ContentValues();
+            v.put("trip_id", tripId);
+            v.put("created_at", System.currentTimeMillis());
+            v.put("total_cents", r.totalCents);
+            v.put("diff_cents", diffCents);
+            v.put("json", o.toString());
+            SQLiteDatabase db = getWritableDatabase();
+            db.insertWithOnConflict("receipts", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            db.execSQL("UPDATE trips SET checked=1 WHERE id=?", new Object[]{tripId});
+        } catch (org.json.JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public SavedReceipt loadReceipt(long tripId) {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT json FROM receipts WHERE trip_id=?", new String[]{String.valueOf(tripId)})) {
+            if (!c.moveToFirst()) return null;
+            org.json.JSONObject o = new org.json.JSONObject(c.getString(0));
+            SavedReceipt s = new SavedReceipt();
+            br.com.carrinhocerto.core.Receipt r = new br.com.carrinhocerto.core.Receipt();
+            r.totalCents = o.optLong("total", -1);
+            r.discountTotalCents = o.optLong("discountTotal", 0);
+            r.store = o.optString("store", null);
+            org.json.JSONArray ls = o.getJSONArray("lines");
+            for (int i = 0; i < ls.length(); i++) {
+                org.json.JSONObject j = ls.getJSONObject(i);
+                br.com.carrinhocerto.core.Receipt.Line l = new br.com.carrinhocerto.core.Receipt.Line();
+                l.seq = j.optInt("seq", -1); l.code = j.optString("code", ""); l.desc = j.optString("desc", "");
+                l.qty = j.optDouble("qty", 1); l.unit = j.optString("unit", "UN"); l.unitCents = j.optLong("unitCents", -1);
+                l.totalCents = j.optLong("totalCents", -1); l.discountCents = j.optLong("disc", 0); l.surchargeCents = j.optLong("sur", 0);
+                r.lines.add(l);
+            }
+            s.receipt = r;
+            org.json.JSONObject f = o.optJSONObject("forced");
+            if (f != null) {
+                java.util.Iterator<String> it = f.keys();
+                while (it.hasNext()) { String k = it.next(); s.forced.put(Integer.parseInt(k), f.getLong(k)); }
+            }
+            return s;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public void deleteReceipt(long tripId) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete("receipts", "trip_id=?", new String[]{String.valueOf(tripId)});
+        db.execSQL("UPDATE trips SET checked=0 WHERE id=?", new Object[]{tripId});
+    }
+
+    /** Diferença (nota - app) da conferência salva, ou null. */
+    public Long receiptDiff(long tripId) {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT diff_cents FROM receipts WHERE trip_id=?", new String[]{String.valueOf(tripId)})) {
+            return c.moveToFirst() && !c.isNull(0) ? c.getLong(0) : null;
+        }
+    }
 }

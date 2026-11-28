@@ -41,7 +41,9 @@ public class TripActivity extends AppCompatActivity {
             int id = mi.getItemId();
             Db.Trip t = db.trip(tripId);
             if (t == null) return true;
-            if (id == R.id.menu_rename) {
+            if (id == R.id.menu_receipt) {
+                startActivity(new Intent(this, ReceiptActivity.class).putExtra(ReceiptActivity.EXTRA_TRIP_ID, tripId));
+            } else if (id == R.id.menu_rename) {
                 Dialogs.askStore(this, "Nome do mercado", null, t.store, "Salvar", name -> { db.setStore(tripId, name); load(); });
             } else if (id == R.id.menu_reopen) {
                 new MaterialAlertDialogBuilder(this)
@@ -76,13 +78,20 @@ public class TripActivity extends AppCompatActivity {
         load();
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        load();
+    }
+
     private void load() {
         Db.Trip t = db.trip(tripId);
         if (t == null) { finish(); return; }
         ((MaterialToolbar) findViewById(R.id.toolbar)).setTitle(t.store == null ? "Compra" : t.store);
         Locale br = Locale.forLanguageTag("pt-BR");
         String when = new SimpleDateFormat("EEEE, dd/MM/yyyy 'às' HH:mm", br).format(new Date(t.finishedAt > 0 ? t.finishedAt : t.createdAt));
-        ((TextView) findViewById(R.id.info)).setText(when + "\n" + t.itemCount + (t.itemCount == 1 ? " item" : " itens"));
+        Long diff = t.checked ? db.receiptDiff(tripId) : null;
+        String checked = diff == null ? "" : "\nNota conferida: " + (diff == 0 ? "sem diferença" : (diff > 0 ? "+" : "−") + Money.format(Math.abs(diff)));
+        ((TextView) findViewById(R.id.info)).setText(when + "\n" + t.itemCount + (t.itemCount == 1 ? " item" : " itens") + checked);
         ((TextView) findViewById(R.id.total)).setText(Money.format(t.totalCents));
         adapter.submit(db.items(tripId));
     }

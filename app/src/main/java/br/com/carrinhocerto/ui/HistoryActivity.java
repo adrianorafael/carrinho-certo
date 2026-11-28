@@ -156,7 +156,7 @@ public class HistoryActivity extends AppCompatActivity {
             ((TextView) v.findViewById(R.id.weekday)).setText(new SimpleDateFormat("EEE", BR).format(d).replace(".", ""));
             ((TextView) v.findViewById(R.id.store)).setText(label(t));
             ((TextView) v.findViewById(R.id.info)).setText(new SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", BR).format(d)
-                    + " · " + t.itemCount + (t.itemCount == 1 ? " item" : " itens"));
+                    + " · " + t.itemCount + (t.itemCount == 1 ? " item" : " itens") + (t.checked ? " · ✓ nota conferida" : ""));
             ((TextView) v.findViewById(R.id.total)).setText(Money.format(t.totalCents));
             v.setOnClickListener(x -> startActivity(new Intent(HistoryActivity.this, TripActivity.class).putExtra(TripActivity.EXTRA_TRIP_ID, t.id)));
         }

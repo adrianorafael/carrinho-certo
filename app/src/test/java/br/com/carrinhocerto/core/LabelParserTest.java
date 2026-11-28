@@ -11,6 +11,11 @@ public class LabelParserTest {
         assertTrue(String.join("\n", fails), fails.isEmpty());
     }
 
+    @Test public void cupomFiscal() {
+        List<String> fails = ReceiptCases.run();
+        assertTrue(String.join("\n", fails), fails.isEmpty());
+    }
+
     @Test public void comparadorDeProdutos() {
         List<String> fails = MatcherCases.run();
         assertTrue(String.join("\n", fails), fails.isEmpty());

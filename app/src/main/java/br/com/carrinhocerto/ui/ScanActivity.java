@@ -72,6 +72,8 @@ public class ScanActivity extends AppCompatActivity {
     public static final String EXTRA_MODE = "mode";
     public static final String MODE_LABEL = "label";
     public static final String MODE_PHOTO = "photo";
+    /** Foto de uma parte do cupom fiscal (moldura alta, sem reduzir a imagem). */
+    public static final String MODE_RECEIPT = "receipt";
     public static final String MODE_BARCODE = "barcode";
     /** Item da lista de compras que está sendo lido (repassado para a confirmação). */
     public static final String EXTRA_LIST_ITEM_ID = "list_item_id";
@@ -126,6 +128,10 @@ public class ScanActivity extends AppCompatActivity {
         barcodeScanner = BarcodeScanning.getClient();
 
         switch (mode) {
+            case MODE_RECEIPT:
+                title.setText("Cupom fiscal");
+                hint.setText("Enquadre uma parte do cupom, de cima para baixo");
+                break;
             case MODE_PHOTO:
                 title.setText("Foto do produto");
                 hint.setText("Enquadre o produto e toque no botão");
@@ -194,6 +200,7 @@ public class ScanActivity extends AppCompatActivity {
         int w = preview.getWidth(), h = preview.getHeight();
         int fw, fh;
         if (MODE_PHOTO.equals(mode)) { fw = (int) (w * 0.86f); fh = fw; }
+        else if (MODE_RECEIPT.equals(mode)) { fw = (int) (w * 0.84f); fh = Math.min((int) (h * 0.62f), (int) (fw * 1.5f)); }
         else if (MODE_BARCODE.equals(mode)) { fw = (int) (w * 0.86f); fh = (int) (fw * 0.45f); }
         else { fw = (int) (w * 0.90f); fh = (int) (fw * 0.70f); }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) frame.getLayoutParams();
@@ -249,14 +256,14 @@ public class ScanActivity extends AppCompatActivity {
 
     private void capture() {
         if (imageCapture == null || busy.getVisibility() == View.VISIBLE) return;
-        busyText.setText(MODE_PHOTO.equals(mode) ? "Salvando foto…" : "Lendo etiqueta…");
+        busyText.setText(MODE_LABEL.equals(mode) ? "Lendo etiqueta…" : "Salvando foto…");
         busy.setVisibility(View.VISIBLE);
         File out = ImageUtils.tempFile(this);
         imageCapture.takePicture(new ImageCapture.OutputFileOptions.Builder(out).build(), worker,
                 new ImageCapture.OnImageSavedCallback() {
                     @Override public void onImageSaved(@NonNull ImageCapture.OutputFileResults r) {
                         runOnUiThread(ScanActivity.this::releaseCamera);
-                        if (MODE_PHOTO.equals(mode)) processPhoto(out);
+                        if (MODE_PHOTO.equals(mode) || MODE_RECEIPT.equals(mode)) processPhoto(out);
                         else processLabel(out);
                     }
                     @Override public void onError(@NonNull ImageCaptureException e) {
@@ -279,11 +286,15 @@ public class ScanActivity extends AppCompatActivity {
 
     private void processPhoto(File f) {
         try {
-            Bitmap full = ImageUtils.decode(f, 1600);
+            boolean receipt = MODE_RECEIPT.equals(mode);
+            Bitmap full = ImageUtils.decode(f, receipt ? 3000 : 1600);
             Bitmap crop = ImageUtils.cropFraction(full, frameFraction());
-            Bitmap small = Bitmap.createScaledBitmap(crop, Math.min(crop.getWidth(), 900),
-                    Math.round(Math.min(crop.getWidth(), 900) * (crop.getHeight() / (float) crop.getWidth())), true);
-            String path = ImageUtils.savePrivate(this, small, "produto");
+            int maxW = receipt ? 1800 : 900;
+            Bitmap small = crop.getWidth() <= maxW ? crop : Bitmap.createScaledBitmap(crop, maxW,
+                    Math.round(maxW * (crop.getHeight() / (float) crop.getWidth())), true);
+            String path = receipt
+                    ? ImageUtils.saveTemp(this, small)
+                    : ImageUtils.savePrivate(this, small, "produto");
             f.delete();
             runOnUiThread(() -> {
                 setResult(RESULT_OK, new Intent().putExtra(R_PHOTO, path));
@@ -383,6 +394,7 @@ public class ScanActivity extends AppCompatActivity {
         if (getCallingActivity() != null) {
             setResult(RESULT_OK, data);
         } else if (Intent.ACTION_SEND.equals(getIntent().getAction())) {
+            if (listItem > 0) data.putExtra(EXTRA_LIST_ITEM_ID, listItem);
             // veio de outro app: abre o carrinho por baixo, para voltar a ele depois de salvar
             Intent main = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             Intent item = new Intent(this, ItemActivity.class).putExtras(data);

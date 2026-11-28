@@ -147,10 +147,17 @@ public class MainActivity extends AppCompatActivity {
         }
         Dialogs.askStore(this, "Finalizar compra", "Total: " + Money.format(trip.totalCents) + "\nA compra vai para o histórico e um carrinho novo começa.",
                 trip.store, "Finalizar", name -> {
-                    db.setStore(trip.id, name);
-                    db.finishTrip(trip.id);
+                    long done = trip.id;
+                    db.setStore(done, name);
+                    db.finishTrip(done);
                     refresh();
-                    Dialogs.ok(root, "Compra salva no histórico ✓");
+                    Snackbar sb = Snackbar.make(root, "Compra salva no histórico ✓", 8000)
+                            .setAction("Conferir nota", v -> startActivity(new Intent(this, ReceiptActivity.class)
+                                    .putExtra(ReceiptActivity.EXTRA_TRIP_ID, done)))
+                            .setActionTextColor(getColor(R.color.white));
+                    sb.setBackgroundTint(getColor(R.color.green));
+                    sb.setTextColor(getColor(R.color.white));
+                    sb.show();
                 });
     }
 

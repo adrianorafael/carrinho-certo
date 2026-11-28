@@ -63,6 +63,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.ReceiptActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".ui.PhotoActivity"
             android:exported="false"
             android:theme="@style/Theme.Carrinho.Camera" />

@@ -77,6 +77,15 @@ public final class ImageUtils {
         return out.getAbsolutePath();
     }
 
+    /** Grava em cache (arquivos temporários, ex.: foto do cupom que só é lida e descartada). */
+    public static String saveTemp(Context c, Bitmap b) throws IOException {
+        File out = new File(c.getCacheDir(), "cupom_" + UUID.randomUUID() + ".jpg");
+        try (FileOutputStream fo = new FileOutputStream(out)) {
+            b.compress(Bitmap.CompressFormat.JPEG, 92, fo);
+        }
+        return out.getAbsolutePath();
+    }
+
     /** Carrega miniatura leve para listas. */
     public static void loadThumb(ImageView v, String path, int sizePx) {
         if (path == null || !new File(path).exists()) { v.setImageDrawable(null); return; }
