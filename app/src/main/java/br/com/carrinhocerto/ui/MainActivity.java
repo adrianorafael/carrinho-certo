@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     private Db db;
     private Db.Trip trip;
     private ItemAdapter adapter;
-    private TextView total, count, storeName;
+    private TextView total, count, storeName, listName;
     private View empty, root;
 
     @Override protected void onCreate(Bundle s) {
@@ -42,6 +42,14 @@ public class MainActivity extends AppCompatActivity {
         total = findViewById(R.id.total);
         count = findViewById(R.id.count);
         storeName = findViewById(R.id.storeName);
+        listName = findViewById(R.id.listName);
+        findViewById(R.id.listBar).setOnClickListener(v -> {
+            if (trip.listId > 0 && db.list(trip.listId) != null) {
+                startActivity(new Intent(this, ListActivity.class).putExtra(ListActivity.EXTRA_LIST_ID, trip.listId));
+            } else {
+                startActivity(new Intent(this, ListsActivity.class).putExtra(ListsActivity.EXTRA_PICK, true));
+            }
+        });
         empty = findViewById(R.id.empty);
 
         MaterialToolbar tb = findViewById(R.id.toolbar);
@@ -89,6 +97,16 @@ public class MainActivity extends AppCompatActivity {
         for (Db.Item i : items) units += i.byWeight ? 1 : i.qty;
         int u = (int) Math.round(units);
         count.setText(items.size() == 0 ? "Nenhum item" : (items.size() + (items.size() == 1 ? " produto" : " produtos") + " · " + u + (u == 1 ? " unidade" : " unidades")));
+        Db.ShoppingList list = trip.listId > 0 ? db.list(trip.listId) : null;
+        if (list != null) {
+            int inCart = 0, n = 0;
+            for (Db.ListRow r : db.listRows(list.id, trip.id)) { n++; if (r.state == Db.IN_CART) inCart++; }
+            listName.setText(list.name + " · " + inCart + " de " + n + " no carrinho");
+            listName.setTextColor(getColor(R.color.blue));
+        } else {
+            listName.setText("Usar uma lista de compras");
+            listName.setTextColor(getColor(R.color.gray));
+        }
         if (trip.store != null) {
             storeName.setText(trip.store);
             storeName.setTextColor(getColor(R.color.ink));
@@ -100,7 +118,10 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean onMenu(MenuItem mi) {
         int id = mi.getItemId();
-        if (id == R.id.menu_history) {
+        if (id == R.id.menu_lists) {
+            startActivity(new Intent(this, ListsActivity.class));
+            return true;
+        } else if (id == R.id.menu_history) {
             startActivity(new Intent(this, HistoryActivity.class));
             return true;
         } else if (id == R.id.menu_clear) {

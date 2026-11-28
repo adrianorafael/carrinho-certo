@@ -73,6 +73,8 @@ public class ScanActivity extends AppCompatActivity {
     public static final String MODE_LABEL = "label";
     public static final String MODE_PHOTO = "photo";
     public static final String MODE_BARCODE = "barcode";
+    /** Item da lista de compras que está sendo lido (repassado para a confirmação). */
+    public static final String EXTRA_LIST_ITEM_ID = "list_item_id";
 
     // resultados
     public static final String R_NAME = "r_name";
@@ -376,6 +378,8 @@ public class ScanActivity extends AppCompatActivity {
             });
 
     private void deliver(Intent data) {
+        long listItem = getIntent().getLongExtra(EXTRA_LIST_ITEM_ID, 0);
+        if (listItem > 0) data.putExtra(EXTRA_LIST_ITEM_ID, listItem);
         if (getCallingActivity() != null) {
             setResult(RESULT_OK, data);
         } else if (Intent.ACTION_SEND.equals(getIntent().getAction())) {

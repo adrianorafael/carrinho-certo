@@ -24,9 +24,12 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import br.com.carrinhocerto.R;
 import br.com.carrinhocerto.core.Money;
+import br.com.carrinhocerto.core.ProductMatcher;
 import br.com.carrinhocerto.data.Db;
 
 /** Confirmação/edição de um item: nome, preço, quantidade e extras (foto e código de barras). */
@@ -115,9 +118,137 @@ public class ItemActivity extends AppCompatActivity {
                 name.requestFocus();
             }
         }
+        if (isNew) {
+            long li = getIntent().getLongExtra(ScanActivity.EXTRA_LIST_ITEM_ID, 0);
+            if (li > 0) {
+                item.listItemId = li;
+                Db.ListItem l = db.listItem(li);
+                if (l != null && l.qty > 1 && !byWeight.isChecked()) qty.setText(Money.formatQty(l.qty));
+            }
+        }
         updateWeightMode();
         showExtras();
         updateSubtotal();
+        setupListLink(isNew && item.listItemId == 0);
+        hint = db.lastPrice(item.barcode, String.valueOf(name.getText()), item.listItemId);
+        showLastPrice();
+    }
+
+    // ------------------------------------------------------------ lista de compras
+
+    private Db.PriceHint hint;
+    private long suggestedListItem;
+
+    /** Mostra a qual item da lista este produto pertence, ou sugere um. */
+    private void setupListLink(boolean suggest) {
+        View card = findViewById(R.id.linkCard);
+        TextView text = findViewById(R.id.linkText);
+        MaterialButton yes = findViewById(R.id.linkYes), no = findViewById(R.id.linkNo), alt = findViewById(R.id.linkAlt);
+        Db.Trip trip = db.trip(item.tripId);
+        long listId = trip != null ? trip.listId : 0;
+        if (item.listItemId > 0) {
+            Db.ListItem l = db.listItem(item.listItemId);
+            if (l == null) { item.listItemId = 0; card.setVisibility(View.GONE); return; }
+            card.setVisibility(View.VISIBLE);
+            text.setText("✓ Item da sua lista: " + l.name);
+            yes.setVisibility(View.GONE);
+            no.setText("Desvincular");
+            no.setOnClickListener(v -> { item.listItemId = 0; setupListLink(false); });
+            alt.setText("Trocar");
+            alt.setVisibility(View.VISIBLE);
+            alt.setOnClickListener(v -> chooseListItem(listId));
+            return;
+        }
+        if (listId <= 0) { card.setVisibility(View.GONE); return; }
+        card.setVisibility(View.VISIBLE);
+        alt.setVisibility(View.VISIBLE);
+        alt.setText("Escolher");
+        alt.setOnClickListener(v -> chooseListItem(listId));
+        yes.setVisibility(View.VISIBLE);
+        no.setText("Ignorar");
+        no.setOnClickListener(v -> card.setVisibility(View.GONE));
+
+        suggestedListItem = 0;
+        if (suggest) {
+            List<Db.ListRow> rows = db.listRows(listId, item.tripId);
+            List<ProductMatcher.Product> cands = new ArrayList<>();
+            List<Db.ListRow> open = new ArrayList<>();
+            for (Db.ListRow r : rows) {
+                if (r.state == Db.IN_CART) continue;
+                open.add(r);
+                cands.add(new ProductMatcher.Product(r.item.name, null, 0));
+            }
+            ProductMatcher.Best best = ProductMatcher.best(
+                    new ProductMatcher.Product(String.valueOf(name.getText()), item.barcode, 0), cands);
+            if (best != null && best.match.confidence == ProductMatcher.Confidence.HIGH) {
+                item.listItemId = open.get(best.index).item.id;   // certeza: vincula direto, dá para desfazer
+                setupListLink(false);
+                return;
+            }
+            if (best != null) suggestedListItem = open.get(best.index).item.id;
+        }
+        if (suggestedListItem > 0) {
+            Db.ListItem l = db.listItem(suggestedListItem);
+            text.setText("É o \"" + l.name + "\" da sua lista?");
+            yes.setText("Sim");
+            yes.setOnClickListener(v -> {
+                item.listItemId = suggestedListItem;
+                if (l.qty > 1 && !byWeight.isChecked() && Money.parseQty(qty.getText().toString()) == 1) qty.setText(Money.formatQty(l.qty));
+                setupListLink(false);
+            });
+        } else {
+            text.setText("Este produto não está na sua lista.");
+            yes.setText("Pôr na lista");
+            yes.setOnClickListener(v -> {
+                String n = String.valueOf(name.getText()).trim();
+                if (n.isEmpty()) { nameLayout.setError("Informe o nome do produto"); return; }
+                Db.ListItem li = new Db.ListItem();
+                li.listId = listId;
+                li.name = n;
+                double q = Money.parseQty(qty.getText().toString());
+                li.qty = q > 0 && !byWeight.isChecked() ? q : 1;
+                item.listItemId = db.saveListItem(li);
+                setupListLink(false);
+            });
+        }
+    }
+
+    private void chooseListItem(long listId) {
+        if (listId <= 0) return;
+        List<Db.ListRow> rows = db.listRows(listId, item.tripId);
+        List<Db.ListRow> opts = new ArrayList<>();
+        for (Db.ListRow r : rows) if (r.state != Db.IN_CART || r.item.id == item.listItemId) opts.add(r);
+        String[] labels = new String[opts.size() + 1];
+        for (int i = 0; i < opts.size(); i++) labels[i] = opts.get(i).item.name + "  (quero " + Money.formatQty(opts.get(i).item.qty) + ")";
+        labels[opts.size()] = "Nenhum (fora da lista)";
+        new MaterialAlertDialogBuilder(this).setTitle("Qual item da lista?")
+                .setItems(labels, (d, w) -> {
+                    item.listItemId = w < opts.size() ? opts.get(w).item.id : 0;
+                    if (w < opts.size()) {
+                        Db.ListItem l = opts.get(w).item;
+                        if (l.qty > 1 && !byWeight.isChecked() && Money.parseQty(qty.getText().toString()) == 1) qty.setText(Money.formatQty(l.qty));
+                    }
+                    setupListLink(false);
+                })
+                .show();
+    }
+
+    /** "Da última vez: R$ X no Mercado Y" e se agora está mais caro ou mais barato. */
+    private void showLastPrice() {
+        TextView tv = findViewById(R.id.lastPrice);
+        if (hint == null) { tv.setVisibility(View.GONE); return; }
+        String when = new java.text.SimpleDateFormat("dd/MM", java.util.Locale.forLanguageTag("pt-BR")).format(new java.util.Date(hint.when));
+        String base = "Da última vez: " + Money.format(hint.cents) + (hint.store != null ? " em " + hint.store : "") + " (" + when + ")";
+        long now = Money.parse(String.valueOf(price.getText()));
+        int color = R.color.gray;
+        if (now > 0 && now != hint.cents) {
+            long d = now - hint.cents;
+            base += d > 0 ? "  ▲ " + Money.format(d) + " mais caro" : "  ▼ " + Money.format(-d) + " mais barato";
+            color = d > 0 ? R.color.red : R.color.green;
+        }
+        tv.setText(base);
+        tv.setTextColor(getColor(color));
+        tv.setVisibility(View.VISIBLE);
     }
 
     private void bind() {
@@ -156,6 +287,7 @@ public class ItemActivity extends AppCompatActivity {
                 qtyError.setVisibility(View.GONE);
                 updateSubtotal();
                 if (!fillingChips) syncPriceChip();
+                if (hint != null) showLastPrice();
             }
         };
         price.addTextChangedListener(w);
@@ -358,6 +490,7 @@ public class ItemActivity extends AppCompatActivity {
                             if (dup.photoPath == null) dup.photoPath = item.photoPath;
                             else if (item.photoPath != null) new File(item.photoPath).delete();
                             if (dup.barcode == null) dup.barcode = item.barcode;
+                            if (dup.listItemId == 0) dup.listItemId = item.listItemId;
                             if (item.labelPhotoPath != null) new File(item.labelPhotoPath).delete();
                             db.save(dup);
                             finish();

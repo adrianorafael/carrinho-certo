@@ -55,6 +55,54 @@
                     app:icon="@drawable/ic_refresh" />
             </LinearLayout>
 
+            <!-- vínculo com a lista de compras -->
+            <LinearLayout
+                android:id="@+id/linkCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_info"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/linkText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:drawablePadding="8dp"
+                    android:textColor="@color/blue_dark"
+                    android:textSize="15sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/linkNo"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Não" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/linkAlt"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Escolher" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/linkYes"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sim" />
+                </LinearLayout>
+            </LinearLayout>
+
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/labelPhoto"
                 android:layout_width="match_parent"
@@ -130,6 +178,15 @@
                 android:layout_height="wrap_content"
                 app:selectionRequired="false"
                 app:singleSelection="true" />
+
+            <TextView
+                android:id="@+id/lastPrice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/gray"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/byWeight"

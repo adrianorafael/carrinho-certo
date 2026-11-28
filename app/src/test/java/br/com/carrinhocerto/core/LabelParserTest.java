@@ -10,4 +10,9 @@ public class LabelParserTest {
         List<String> fails = LabelParserCases.run();
         assertTrue(String.join("\n", fails), fails.isEmpty());
     }
+
+    @Test public void comparadorDeProdutos() {
+        List<String> fails = MatcherCases.run();
+        assertTrue(String.join("\n", fails), fails.isEmpty());
+    }
 }
